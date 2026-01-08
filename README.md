@@ -9,7 +9,7 @@
 [![Electron](https://img.shields.io/badge/Electron-47848F?style=for-the-badge&logo=electron&logoColor=white)](https://www.electronjs.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
-[Features](#-features) • [Getting Started](#-getting-started) • [Roadmap](#-acwoc-roadmap) • [Contributing](#-contributing) • [Design](#-design--branding)
+[Features](#-features) • [Getting Started](#-getting-started) • [Contributing](#-contributing) • [Design](#-design--branding)
 
 ---
 
@@ -374,9 +374,6 @@ Implement a minimal end-to-end feature first:
 - 🤖 **AI Tools:** Use responsibly (see [AIPromptingMasterGuide.md](AIPromptingMasterGuide.md))
 
 ---
-
-## 🗺️ AcWoC Roadmap
-
 ### 🤖 AI Usage Policy
 
 We embrace modern tools, but maintain high standards:
@@ -397,31 +394,6 @@ We embrace modern tools, but maintain high standards:
 - 🎨 **Design:** UI/UX, branding, graphics
 - 📚 **Documentation:** Guides, tutorials, API docs
 - 🧪 **Testing:** Unit tests, integration tests, QA
-
----
-
-## 🗺️ AcWoC Roadmap
-
-### Phase 1: The Backbone (Weeks 1-2)
-- [ ] Establish stable mDNS discovery
-- [ ] Build WebSocket handshake logic
-- [ ] **Design:** Logo and initial Brand Style Guide
-
-### Phase 2: Input & Clipboard (Weeks 3-4)
-- [ ] Implement bi-directional clipboard syncing
-- [ ] Prototype keyboard event capturing on Desktop
-- [ ] **Design:** UI Mockups for the Connection Screen
-
-### Phase 3: The Vision (Weeks 5-6)
-- [ ] Integrate WebRTC for camera streaming
-- [ ] Virtual Camera driver wrappers (Windows/Linux)
-- [ ] **Design:** Camera settings and preview UI
-
-### Phase 4: Polish (Weeks 7-8)
-- [ ] End-to-End Encryption (E2EE)
-- [ ] Dark mode and "Zen" UI refinements
-- [ ] Performance optimization and testing
-- [ ] **Design:** Final marketing assets
 
 ---
 
