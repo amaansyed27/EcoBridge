@@ -18,7 +18,7 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: 20
         cache: 'npm'
         cache-dependency-path: 'desktop/package-lock.json'
     
@@ -41,7 +41,7 @@ jobs:
     - name: Set up Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.16.x'
+        flutter-version: '^3.29.0'
         channel: 'stable'
     
     - name: Get Flutter dependencies
