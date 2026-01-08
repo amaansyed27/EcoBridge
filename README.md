@@ -19,6 +19,15 @@
 
 EcoBridge is a high-performance, open-source ecosystem bridge that breaks down the proprietary walls between your devices. Turn your Android phone into a powerful extension of your desktop—use it as a webcam, share your keyboard and clipboard, or pass through peripherals seamlessly. Built with Flutter and Electron, EcoBridge delivers low-latency performance with end-to-end encryption across Windows, Linux, and macOS. Experience true device continuity without being locked into expensive, manufacturer-specific ecosystems.
 
+### 🛠️ Main Tech Stack
+
+[![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://www.android.com)
+[![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
+[![Electron](https://img.shields.io/badge/Electron-47848F?style=for-the-badge&logo=electron&logoColor=white)](https://www.electronjs.org)
+[![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org)
+[![Windows](https://img.shields.io/badge/Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
+
 ---
 
 ## 🎯 The Vision
