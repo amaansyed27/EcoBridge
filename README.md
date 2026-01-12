@@ -378,6 +378,18 @@ We embrace modern tools, but maintain high standards:
 - 📚 **Documentation:** Guides, tutorials, API docs
 - 🧪 **Testing:** Unit tests, integration tests, QA
 
+### 🔄 Continuous Integration
+
+We use GitHub Actions to ensure code quality on every update.
+
+**Desktop Workflow:**
+- **Trigger:** Pushes to `main` and Pull Requests.
+- **Steps:** Installs Node.js, dependencies, and runs `npm run build`.
+
+**Mobile Workflow:**
+- **Trigger:** Pushes to `main` and Pull Requests.
+- **Steps:** Sets up Java & Flutter, runs `flutter pub get`, and executes `flutter analyze`.
+
 ---
 
 ## 📊 Project Structure
