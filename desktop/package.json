@@ -11,29 +11,35 @@
     "start": "electron .",
     "package": "electron-builder"
   },
-  "keywords": ["ecobridge", "continuity", "ecosystem"],
+  "keywords": [
+    "ecobridge",
+    "continuity",
+    "ecosystem"
+  ],
   "author": "AcWoC 2026",
   "license": "MIT",
   "dependencies": {
+    "bonjour-service": "^1.1.1",
+    "electron-is-dev": "^2.0.0",
+    "express": "^5.2.1",
     "next": "^14.0.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "electron-is-dev": "^2.0.0",
-    "socket.io": "^4.6.1",
-    "socket.io-client": "^4.6.1",
-    "bonjour-service": "^1.1.1"
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
-    "electron": "^28.1.0",
-    "electron-builder": "^24.9.1",
-    "concurrently": "^8.2.2",
-    "wait-on": "^7.2.0",
-    "tailwindcss": "^3.4.0",
-    "postcss": "^8.4.32",
-    "autoprefixer": "^10.4.16",
     "@types/node": "^20.10.6",
     "@types/react": "^18.2.46",
     "@types/react-dom": "^18.2.18",
-    "typescript": "^5.3.3"
-  }
+    "autoprefixer": "^10.4.16",
+    "concurrently": "^8.2.2",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.3.3",
+    "wait-on": "^7.2.0"
+  },
+  "type": "commonjs"
 }
