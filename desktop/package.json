@@ -4,9 +4,10 @@
   "description": "EcoBridge Desktop - Universal ecosystem bridge",
   "main": "src/electron/main.js",
   "scripts": {
-    "dev": "concurrently \"npm run dev:next\" \"npm run dev:electron\"",
+    "dev": "concurrently \"npm run dev:next\" \"npm run dev:electron\" \"npm run dev:socket\"",
     "dev:next": "next dev",
     "dev:electron": "wait-on http://localhost:3000 && electron .",
+    "dev:socket": "node socket_server.js",
     "build": "next build",
     "start": "electron .",
     "package": "electron-builder"
@@ -22,11 +23,14 @@
     "bonjour-service": "^1.1.1",
     "electron-is-dev": "^2.0.0",
     "express": "^5.2.1",
+    "loudness": "^0.4.2",
     "next": "^14.0.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "shelljs": "^0.10.0",
     "socket.io": "^4.8.3",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.3",
+    "systeminformation": "^5.30.6"
   },
   "devDependencies": {
     "@types/node": "^20.10.6",
