@@ -1,7 +1,75 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:socket_io_client/socket_io_client.dart' as io;
+import 'dashboard_screen.dart';
+import 'input_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
+
+  static const _inputChannel = MethodChannel('com.acwoc.ecobridge/input');
+
+  // Shared Socket state
+  static io.Socket? _socket;
+  static bool _isConnected = false;
+  static String _pcIp = "10.0.2.2";
+
+  void _initGlobalSocket() {
+    if (_socket != null) return;
+
+    _socket = io.io('http://$_pcIp:3001', <String, dynamic>{
+      'transports': ['websocket'],
+      'autoConnect': true,
+      'reconnection': true,
+    });
+
+    _socket!.onConnect((_) {
+      _isConnected = true;
+    });
+
+    _socket!.onDisconnect((_) {
+      _isConnected = false;
+    });
+  }
+
+  Future<void> _checkAccessibility(BuildContext context) async {
+    _initGlobalSocket();
+    final bool enabled = await _inputChannel.invokeMethod('isAccessibilityServiceEnabled');
+    if (!enabled && context.mounted) {
+      // ... same dialog logic ...
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF111111),
+          title: const Text("Accessibility Required", style: TextStyle(color: Colors.white)),
+          content: const Text(
+            "To use Remote Input, you need to enable the EcoBridge Accessibility Service in your phone settings.",
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Later"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                _inputChannel.invokeMethod('openAccessibilitySettings');
+                Navigator.pop(context);
+              },
+              child: const Text("Enable Now"),
+            ),
+          ],
+        ),
+      );
+    } else if (enabled && context.mounted) {
+       Navigator.push(
+        context, 
+        MaterialPageRoute(
+          builder: (_) => InputScreen(socket: _socket!, isConnected: _isConnected)
+        )
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,88 +123,115 @@ class HomeScreen extends StatelessWidget {
                   ],
                 ),
                   
-                  const Spacer(),
+                const Spacer(),
 
-                  // Central Hero Section - Minimalist Glass
-                  Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Main Visual
-                        Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(30),
-                            color: const Color(0xFF111111),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.05),
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.5),
-                                blurRadius: 30,
-                                offset: const Offset(0, 10),
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            Icons.phonelink_ring_rounded,
-                            size: 48,
-                            color: Colors.white.withValues(alpha: 0.9),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const Spacer(),
-                  
-                  // Bottom Actions - Minimal Grid
-                  Row(
+                // Central Hero Section - Minimalist Glass
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Expanded(child: _buildMinimalAction(Icons.videocam_outlined, "Webcam")),
-                      const SizedBox(width: 12),
-                      Expanded(child: _buildMinimalAction(Icons.keyboard_outlined, "Input")),
-                      const SizedBox(width: 12),
-                      Expanded(child: _buildMinimalAction(Icons.copy_rounded, "Clipboard")),
+                      // Main Visual
+                      Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(30),
+                          color: const Color(0xFF111111),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.05),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.5),
+                              blurRadius: 30,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          Icons.phonelink_ring_rounded,
+                          size: 48,
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 48),
-                ],
-              ),
+                ),
+
+                const Spacer(),
+                
+                // Bottom Actions - Minimal Grid
+                Row(
+                  children: [
+                    Expanded(child: _buildMinimalAction(context, Icons.videocam_outlined, "Webcam", () {})),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildMinimalAction(context, Icons.keyboard_outlined, "Input", () => _checkAccessibility(context))),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildMinimalAction(context, Icons.copy_rounded, "Clipboard", () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Universal Clipboard is active!"),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    })),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildMinimalAction(
+                        context, 
+                        Icons.dashboard_customize_outlined, 
+                        "Dashboard", 
+                        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DashboardScreen()))
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: Container()), // Placeholder for symmetry
+                    const SizedBox(width: 12),
+                    Expanded(child: Container()), // Placeholder for symmetry
+                  ],
+                ),
+                const SizedBox(height: 48),
+              ],
             ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildMinimalAction(IconData icon, String label) {
-    return Container(
-      height: 90,
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F0F0F),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.05),
-          width: 0.5,
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: Colors.white.withValues(alpha: 0.8), size: 26),
-          const SizedBox(height: 10),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.white.withValues(alpha: 0.4),
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0.3,
-            ),
+  Widget _buildMinimalAction(BuildContext context, IconData icon, String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 90,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F0F0F),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.05),
+            width: 0.5,
           ),
-        ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white.withValues(alpha: 0.8), size: 26),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white.withValues(alpha: 0.4),
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
