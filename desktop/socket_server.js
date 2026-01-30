@@ -13,19 +13,17 @@ const io = new Server(server, {
 
 const PORT = 3001; // Changed from 3000 to avoid conflict with Next.js
 
-console.log("🚀 Starting EcoBridge Socket Server...");
+console.log("Starting EcoBridge Socket Server...");
 
-// System monitoring function
+// System monitoring function with individual error handling to prevent hanging
 async function getSystemStats() {
     try {
-        const [cpu, mem, graphics, cpuTemp] = await Promise.all([
-            si.currentLoad(),
-            si.mem(),
-            si.graphics(),
-            si.cpuTemperature()
-        ]);
+        // Run calls individually with fallbacks to prevent one sensor from hanging the whole process
+        const cpu = await si.currentLoad().catch(e => ({ currentLoad: 0 }));
+        const mem = await si.mem().catch(e => ({ total: 1, available: 1 }));
+        const graphics = await si.graphics().catch(e => ({ controllers: [] }));
+        const cpuTemp = await si.cpuTemperature().catch(e => ({ main: 0 }));
         
-        // Find the primary GPU (usually the first one with a name)
         const controllers = graphics.controllers || [];
         const mainGpu = controllers.find(g => g.model && !g.model.includes('Virtual')) || controllers[0] || {};
 
@@ -48,14 +46,9 @@ async function getSystemStats() {
             muted: await loudness.getMuted().catch(() => false)
         };
 
-        // Log stats for debugging (only if load is 0 to see if it's actually 0 or missing)
-        if (stats.cpu.load === 0) {
-            console.log("📊 Stats Debug - CPU Load is 0. Full data:", JSON.stringify(stats.cpu));
-        }
-
         return stats;
     } catch (error) {
-        console.error("❌ Error fetching stats:", error);
+        console.error("Critical error in getSystemStats:", error);
         return null;
     }
 }
@@ -70,7 +63,7 @@ function sendMediaKey(key) {
     };
     const vkCode = codes[key];
     if (vkCode) {
-        console.log(`🎬 Media Action: ${key} (0x${vkCode.toString(16)})`);
+        console.log(`Media Action: ${key} (0x${vkCode.toString(16)})`);
         
         // PowerShell script to simulate media hardware key press
         const psScript = `
@@ -84,29 +77,34 @@ function sendMediaKey(key) {
         const encoded = Buffer.from(psScript, 'utf16le').toString('base64');
         const result = shell.exec(`powershell -ExecutionPolicy Bypass -EncodedCommand ${encoded}`, { silent: true });
         if (result.code !== 0) {
-            console.error(`❌ PowerShell Error (${result.code}):`, result.stderr);
+            console.error(`PowerShell Error (${result.code}):`, result.stderr);
         }
     }
 }
 
 io.on('connection', (socket) => {
-    console.log('🔌 Device Connected:', socket.id);
+    console.log('Device Connected:', socket.id);
 
     // Send initial stats on connection
     getSystemStats().then(stats => {
         if (stats) {
-            console.log("📤 Sending initial stats to", socket.id);
+            console.log("Sending initial stats to", socket.id);
             socket.emit('stats-update', stats);
         }
     });
 
-    socket.on('register', (type) => {
-        console.log(`📱 Registered as: ${type}`);
+    socket.on('register', async (type) => {
+        console.log(`Registered as: ${type}`);
+        // Send fresh stats immediately upon registration
+        const stats = await getSystemStats();
+        if (stats) {
+            socket.emit('stats-update', stats);
+        }
     });
 
     // Handle Commands
     socket.on('command', async (data) => {
-        console.log(`🎮 Command Received: ${data.action}`, data.params);
+        console.log(`Command Received: ${data.action}`, data.params);
         
         switch (data.action) {
             case 'media':
@@ -134,21 +132,22 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        console.log('❌ Disconnected:', socket.id);
+        console.log('Disconnected:', socket.id);
     });
 });
 
-// Broadcast stats every 2 seconds
+// Broadcast stats every 5 seconds
 setInterval(async () => {
     if (io.engine.clientsCount > 0) {
         const stats = await getSystemStats();
         if (stats) {
+            console.log(`Broadcasting stats to ${io.engine.clientsCount} devices`);
             io.emit('stats-update', stats);
         }
     }
-}, 2000);
+}, 5000);
 
 server.listen(PORT, () => {
-    console.log(`✅ Server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
     console.log(`   - Dashboard Server: http://localhost:${PORT}`);
 });
