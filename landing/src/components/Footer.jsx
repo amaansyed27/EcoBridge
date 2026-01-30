@@ -25,8 +25,7 @@ const Footer = () => {
             transition={{ delay: 0.2 }}
             className="text-foreground/20 text-xs font-black uppercase tracking-[0.2em] text-center"
           >
-            © 2026 EcoBridge. MIT License. <br className="md:hidden" />
-            Built with ❤️ for AcWoC 2026.
+            © 2026 EcoBridge. MIT License.
           </motion.div>
           
           <motion.div 
@@ -39,7 +38,6 @@ const Footer = () => {
             {[
               { label: 'GitHub', href: 'https://github.com/amaansyed27/EcoBridge' },
               { label: 'Docs', href: '#' },
-              { label: 'Privacy', href: '#' },
             ].map((link) => (
               <a 
                 key={link.label}
