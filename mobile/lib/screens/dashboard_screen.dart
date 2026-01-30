@@ -19,8 +19,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     'muted': false,
   };
   bool isConnected = false;
-  String pcIp = "10.0.2.2"; // Default for emulators
-  final TextEditingController _ipController = TextEditingController(text: "10.0.2.2");
+  static String pcIp = "10.0.2.2"; // Static to persist between screen navigations
+  static final TextEditingController _ipController = TextEditingController(text: pcIp);
 
   @override
   void initState() {
@@ -28,17 +28,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
     initSocket();
   }
 
+  @override
+  void dispose() {
+    socket.off('stats-update');
+    socket.disconnect();
+    socket.dispose();
+    super.dispose();
+  }
+
   void initSocket() {
-    // If socket already exists, dispose it before creating a new one
-    if (this.mounted && isConnected) {
+    // Disconnect existing socket if it exists to avoid multiple listeners
+    try {
+      socket.off('stats-update');
       socket.disconnect();
       socket.dispose();
+    } catch (_) {
+      // Ignore if socket wasn't initialized yet
     }
 
     socket = io.io('http://$pcIp:3001', <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': true,
       'reconnection': true,
+      'forceNew': true, // Ensure a fresh connection
     });
 
     socket.onConnect((_) {
@@ -108,12 +120,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    socket.dispose();
-    super.dispose();
   }
 
   @override
