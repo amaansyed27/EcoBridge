@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
-import 'package:encrypt/encrypt.dart' as encrypt;
 import 'dart:async';
 
 class DashboardScreen extends StatefulWidget {
@@ -24,62 +22,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
   static String pcIp = "10.0.2.2"; // Static to persist between screen navigations
   static final TextEditingController _ipController = TextEditingController(text: pcIp);
 
-  // Clipboard Bridge state
-  String _lastClipboardContent = "";
-  Timer? _clipboardTimer;
-  final String _sharedSecret = "ecobridge_secret_key_2026_bridge";
-  final String _fixedIv = "ecobridge_init_v";
-
-  // Input Bridge state
-  static const _inputChannel = MethodChannel('com.acwoc.ecobridge/input');
-
   @override
   void initState() {
     super.initState();
     initSocket();
-    _startClipboardMonitor();
   }
 
   @override
   void dispose() {
-    _clipboardTimer?.cancel();
     socket.off('stats-update');
-    socket.off('clipboard-sync');
     socket.disconnect();
     socket.dispose();
     super.dispose();
-  }
-
-  // Encryption Helpers (AES-256-CBC)
-  String _encrypt(String text) {
-    final key = encrypt.Key.fromUtf8(_sharedSecret);
-    final iv = encrypt.IV.fromUtf8(_fixedIv);
-    final encrypter = encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc));
-    final encrypted = encrypter.encrypt(text, iv: iv);
-    return encrypted.base64;
-  }
-
-  String _decrypt(String ciphertext) {
-    final key = encrypt.Key.fromUtf8(_sharedSecret);
-    final iv = encrypt.IV.fromUtf8(_fixedIv);
-    final encrypter = encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc));
-    return encrypter.decrypt64(ciphertext, iv: iv);
-  }
-
-  void _startClipboardMonitor() {
-    _clipboardTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
-      if (!isConnected) return;
-      
-      final data = await Clipboard.getData(Clipboard.kTextPlain);
-      if (data != null && data.text != null && data.text != _lastClipboardContent) {
-        debugPrint("Local clipboard changed, syncing to PC...");
-        _lastClipboardContent = data.text!;
-        socket.emit('clipboard-sync', {
-          'content': _encrypt(data.text!),
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        });
-      }
-    });
   }
 
   void initSocket() {
@@ -113,29 +67,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         setState(() {
           stats = Map<String, dynamic>.from(data);
         });
-      }
-    });
-
-    socket.on('clipboard-sync', (data) {
-      try {
-        final decrypted = _decrypt(data['content']);
-        if (decrypted != _lastClipboardContent) {
-          debugPrint("Clipboard received from PC, updating local...");
-          _lastClipboardContent = decrypted;
-          Clipboard.setData(ClipboardData(text: decrypted));
-          
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Clipboard synced from PC"),
-                duration: Duration(seconds: 2),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
-        }
-      } catch (e) {
-        debugPrint("Failed to decrypt clipboard from PC: $e");
       }
     });
   }
@@ -302,29 +233,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 32),
             const Text("Quick Actions", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white70)),
             const SizedBox(height: 16),
+            
             Row(
               children: [
                 Expanded(
                   child: _buildActionButton(
-                    "Lock PC",
-                    Icons.lock_outline,
-                    Colors.redAccent,
-                    () => sendCommand('system', {'type': 'lock'}),
+                    "Lock PC", 
+                    Icons.lock_outline, 
+                    () => sendCommand('system', {'type': 'lock'})
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: _buildActionButton(
-                    "Task Mgr",
-                    Icons.assignment_outlined,
-                    Colors.greenAccent,
-                    () => sendCommand('system', {'type': 'taskmgr'}),
+                    "Task Manager", 
+                    Icons.assignment_outlined, 
+                    () => sendCommand('system', {'type': 'taskmgr'})
                   ),
                 ),
               ],
             ),
-            
-            const SizedBox(height: 120), // Bottom padding
           ],
         ),
       ),
@@ -365,23 +293,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildActionButton(String label, IconData icon, Color color, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.2)),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color),
-            const SizedBox(height: 8),
-            Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
-          ],
+  Widget _buildActionButton(String title, IconData icon, VoidCallback onTap) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          decoration: BoxDecoration(
+            color: const Color(0xFF111111),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withOpacity(0.05)),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: Colors.white, size: 28),
+              const SizedBox(height: 12),
+              Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+            ],
+          ),
         ),
       ),
     );

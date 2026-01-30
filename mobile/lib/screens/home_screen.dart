@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'dashboard_screen.dart';
-import 'input_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -165,16 +162,9 @@ class HomeScreen extends StatelessWidget {
                   children: [
                     Expanded(child: _buildMinimalAction(context, Icons.videocam_outlined, "Webcam", () {})),
                     const SizedBox(width: 12),
-                    Expanded(child: _buildMinimalAction(context, Icons.keyboard_outlined, "Input", () => _checkAccessibility(context))),
+                    Expanded(child: _buildMinimalAction(context, Icons.keyboard_outlined, "Input", () {})),
                     const SizedBox(width: 12),
-                    Expanded(child: _buildMinimalAction(context, Icons.copy_rounded, "Clipboard", () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Universal Clipboard is active!"),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    })),
+                    Expanded(child: _buildMinimalAction(context, Icons.copy_rounded, "Clipboard", () {})),
                   ],
                 ),
                 const SizedBox(height: 12),

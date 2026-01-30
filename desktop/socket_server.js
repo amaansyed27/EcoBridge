@@ -4,9 +4,6 @@ const { Server } = require('socket.io');
 const si = require('systeminformation');
 const loudness = require('loudness');
 const shell = require('shelljs');
-const clipboardy = require('clipboardy');
-const CryptoJS = require('crypto-js');
-const { spawn } = require('child_process');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,56 +11,9 @@ const io = new Server(server, {
     cors: { origin: "*" }
 });
 
-const PORT = 3001;
-const SHARED_SECRET = "ecobridge_secret_key_2026_bridge"; // 32 chars for AES-256
-const FIXED_IV = "ecobridge_init_v"; // 16 chars
-
-// Persistent PowerShell process for high-performance input injection
-const ps = spawn('powershell.exe', ['-ExecutionPolicy', 'Bypass', '-Command', '-'], {
-    stdio: ['pipe', 'pipe', 'inherit']
-});
-
-// Helper to send command to persistent PowerShell
-function sendToPS(command) {
-    ps.stdin.write(command + '\n');
-}
-
-// Initialize Win32 API in the persistent PowerShell session
-sendToPS(`
-    $signature = @'
-    [DllImport("user32.dll")] public static extern void mouse_event(uint dwFlags, int dx, int dy, uint dwData, int dwExtraInfo);
-    [DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
-'@
-    $type = Add-Type -MemberDefinition $signature -Name "Win32Utils" -Namespace "Win32" -PassThru
-`);
+const PORT = 3001; // Changed from 3000 to avoid conflict with Next.js
 
 console.log("Starting EcoBridge Socket Server...");
-
-// Clipboard state
-let lastClipboardContent = "";
-
-// Encryption Helper (AES-256-CBC)
-function encrypt(text) {
-    const key = CryptoJS.enc.Utf8.parse(SHARED_SECRET);
-    const iv = CryptoJS.enc.Utf8.parse(FIXED_IV);
-    const encrypted = CryptoJS.AES.encrypt(text, key, {
-        iv: iv,
-        mode: CryptoJS.mode.CBC,
-        padding: CryptoJS.pad.Pkcs7
-    });
-    return encrypted.toString();
-}
-
-function decrypt(ciphertext) {
-    const key = CryptoJS.enc.Utf8.parse(SHARED_SECRET);
-    const iv = CryptoJS.enc.Utf8.parse(FIXED_IV);
-    const decrypted = CryptoJS.AES.decrypt(ciphertext, key, {
-        iv: iv,
-        mode: CryptoJS.mode.CBC,
-        padding: CryptoJS.pad.Pkcs7
-    });
-    return decrypted.toString(CryptoJS.enc.Utf8);
-}
 
 // System monitoring function with individual error handling to prevent hanging
 async function getSystemStats() {
@@ -152,55 +102,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Handle Clipboard Sync from Mobile
-    socket.on('clipboard-sync', (data) => {
-        try {
-            const decrypted = decrypt(data.content);
-            if (decrypted && decrypted !== lastClipboardContent) {
-                console.log("Clipboard received from mobile, updating local...");
-                lastClipboardContent = decrypted;
-                clipboardy.writeSync(decrypted);
-            }
-        } catch (e) {
-            console.error("Failed to decrypt clipboard from mobile", e);
-        }
-    });
-
-    // Handle Remote Input from Mobile (Mobile controlling PC)
-    socket.on('remote-input', (data) => {
-        const { type, params } = data;
-        
-        switch (type) {
-            case 'mouse-move':
-                // MOUSEEVENTF_MOVE = 0x0001
-                sendToPS(`[Win32.Win32Utils]::mouse_event(0x0001, ${Math.round(params.dx)}, ${Math.round(params.dy)}, 0, 0)`);
-                break;
-            case 'mouse-click':
-                const button = params.button || 'left';
-                if (button === 'left') {
-                    // LEFTDOWN = 0x0002, LEFTUP = 0x0004
-                    sendToPS(`[Win32.Win32Utils]::mouse_event(0x0002, 0, 0, 0, 0)`);
-                    sendToPS(`[Win32.Win32Utils]::mouse_event(0x0004, 0, 0, 0, 0)`);
-                } else if (button === 'right') {
-                    // RIGHTDOWN = 0x0008, RIGHTUP = 0x0010
-                    sendToPS(`[Win32.Win32Utils]::mouse_event(0x0008, 0, 0, 0, 0)`);
-                    sendToPS(`[Win32.Win32Utils]::mouse_event(0x0010, 0, 0, 0, 0)`);
-                }
-                break;
-            case 'mouse-scroll':
-                // WHEEL = 0x0800
-                sendToPS(`[Win32.Win32Utils]::mouse_event(0x0800, 0, 0, ${Math.round(params.delta)}, 0)`);
-                break;
-            case 'keyboard':
-                // Simplified keyboard injection via SendKeys if it's a string
-                if (params.text) {
-                    const escaped = params.text.replace(/([+^%~(){}[\]])/g, '{$1}');
-                    sendToPS(`Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("${escaped}")`);
-                }
-                break;
-        }
-    });
-
     // Handle Commands
     socket.on('command', async (data) => {
         console.log(`Command Received: ${data.action}`, data.params);
@@ -245,25 +146,6 @@ setInterval(async () => {
         }
     }
 }, 5000);
-
-// Monitor local clipboard every 1 second
-setInterval(() => {
-    if (io.engine.clientsCount > 0) {
-        try {
-            const currentContent = clipboardy.readSync();
-            if (currentContent && currentContent !== lastClipboardContent) {
-                console.log("Local clipboard changed, syncing to mobile...");
-                lastClipboardContent = currentContent;
-                io.emit('clipboard-sync', {
-                    content: encrypt(currentContent),
-                    timestamp: Date.now()
-                });
-            }
-        } catch (e) {
-            // Clipboard might be busy
-        }
-    }
-}, 1000);
 
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
