@@ -1,8 +1,17 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const isDev = require('electron-is-dev');
+const io = require('socket.io-client');
 
 let mainWindow;
+let socket;
+
+function connectSocket() {
+  socket = io('http://localhost:3001');
+  socket.on('connect', () => {
+    console.log('Connected to socket server');
+  });
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -35,7 +44,17 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWindow();
+  connectSocket();
+});
+
+// IPC Listeners for input
+ipcMain.on('send-input', (event, data) => {
+  if (socket && socket.connected) {
+    socket.emit('input-event', data);
+  }
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

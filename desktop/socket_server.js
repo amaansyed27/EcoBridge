@@ -63,23 +63,77 @@ function sendMediaKey(key) {
     };
     const vkCode = codes[key];
     if (vkCode) {
-        console.log(`Media Action: ${key} (0x${vkCode.toString(16)})`);
-        
-        // PowerShell script to simulate media hardware key press
-        const psScript = `
-            $signature = '[DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);'
-            $type = Add-Type -MemberDefinition $signature -Name "Win32Utils" -Namespace "Win32" -PassThru
-            $type::keybd_event(${vkCode}, 0, 0, 0)
-            $type::keybd_event(${vkCode}, 0, 2, 0)
-        `;
-        
-        // Encode to Base64 (UTF-16LE) for PowerShell -EncodedCommand
-        const encoded = Buffer.from(psScript, 'utf16le').toString('base64');
-        const result = shell.exec(`powershell -ExecutionPolicy Bypass -EncodedCommand ${encoded}`, { silent: true });
-        if (result.code !== 0) {
-            console.error(`PowerShell Error (${result.code}):`, result.stderr);
-        }
+        executeWin32Key(vkCode);
     }
+}
+
+// Win32 Input Simulation via PowerShell
+function executeWin32Key(vkCode, flags = 0) {
+    const psScript = `
+        $signature = '[DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);'
+        $type = Add-Type -MemberDefinition $signature -Name "Win32Utils" -Namespace "Win32" -PassThru
+        $type::keybd_event(${vkCode}, 0, ${flags}, 0)
+        ${flags === 0 ? `$type::keybd_event(${vkCode}, 0, 2, 0)` : ''}
+    `;
+    const encoded = Buffer.from(psScript, 'utf16le').toString('base64');
+    shell.exec(`powershell -ExecutionPolicy Bypass -EncodedCommand ${encoded}`, { silent: true });
+}
+
+const clipboardy = require('clipboardy');
+
+// Store last clipboard content to avoid loops
+let lastClipboard = '';
+
+// Watch clipboard for changes
+setInterval(async () => {
+    try {
+        let current;
+        if (clipboardy.readSync) {
+            current = clipboardy.readSync();
+        } else if (clipboardy.default && clipboardy.default.readSync) {
+            current = clipboardy.default.readSync();
+        } else {
+            current = await clipboardy.read();
+        }
+
+        if (current && current !== lastClipboard) {
+            lastClipboard = current;
+            if (io.engine.clientsCount > 0) {
+                console.log('Clipboard changed, syncing to devices...');
+                io.emit('clipboard-sync', { text: current });
+            }
+        }
+    } catch (err) {
+        // Silent fail for clipboard read errors
+    }
+}, 2000);
+
+function executeWin32Mouse(dx, dy, flags) {
+    let psScript;
+    if (flags === 0x0001) { // MOUSEEVENTF_MOVE
+        psScript = `
+            Add-Type -AssemblyName System.Windows.Forms
+            $pos = [System.Windows.Forms.Cursor]::Position
+            [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point(($pos.X + ${Math.round(dx)}), ($pos.Y + ${Math.round(dy)}))
+        `;
+    } else {
+        psScript = `
+            $signature = '[DllImport("user32.dll")] public static extern void mouse_event(uint dwFlags, int dx, int dy, uint dwData, int dwExtraInfo);'
+            $type = Add-Type -MemberDefinition $signature -Name "Win32UtilsMouse${flags}" -Namespace "Win32" -PassThru
+            $type::mouse_event(${flags}, ${dx}, ${dy}, 0, 0)
+        `;
+    }
+    const encoded = Buffer.from(psScript, 'utf16le').toString('base64');
+    shell.exec(`powershell -ExecutionPolicy Bypass -EncodedCommand ${encoded}`, { silent: true });
+}
+
+function executeWin32Text(text) {
+    const psScript = `
+        Add-Type -AssemblyName System.Windows.Forms
+        [System.Windows.Forms.SendKeys]::SendWait("${text.replace(/"/g, '""')}")
+    `;
+    const encoded = Buffer.from(psScript, 'utf16le').toString('base64');
+    shell.exec(`powershell -ExecutionPolicy Bypass -EncodedCommand ${encoded}`, { silent: true });
 }
 
 io.on('connection', (socket) => {
@@ -129,6 +183,52 @@ io.on('connection', (socket) => {
         // Send updated stats immediately after command
         const stats = await getSystemStats();
         io.emit('stats-update', stats);
+    });
+
+    socket.on('remote-input', (data) => {
+        switch (data.type) {
+            case 'mouse-move':
+                // MOUSEEVENTF_MOVE = 0x0001
+                executeWin32Mouse(data.params.dx, data.params.dy, 0x0001);
+                break;
+            case 'mouse-click':
+                console.log(`Mouse ${data.params.button} click request received`);
+                if (data.params.button === 'left') {
+                    // LEFTDOWN = 0x0002, LEFTUP = 0x0004
+                    executeWin32Mouse(0, 0, 0x0002);
+                    executeWin32Mouse(0, 0, 0x0004);
+                } else if (data.params.button === 'right') {
+                    // RIGHTDOWN = 0x0008, RIGHTUP = 0x0010
+                    executeWin32Mouse(0, 0, 0x0008);
+                    executeWin32Mouse(0, 0, 0x0010);
+                }
+                break;
+            case 'keyboard':
+                if (data.params.text) {
+                    console.log(`Keyboard text received: "${data.params.text}"`);
+                    executeWin32Text(data.params.text);
+                }
+                break;
+        }
+    });
+
+    socket.on('clipboard-sync', async (data) => {
+        if (data.text && data.text !== lastClipboard) {
+            console.log('Clipboard sync received from mobile');
+            lastClipboard = data.text;
+            try {
+                // Handle both ESM and CJS styles if possible, or fallback to async write
+                if (clipboardy.writeSync) {
+                    clipboardy.writeSync(data.text);
+                } else if (clipboardy.default && clipboardy.default.writeSync) {
+                    clipboardy.default.writeSync(data.text);
+                } else {
+                    await clipboardy.write(data.text);
+                }
+            } catch (err) {
+                console.error('Failed to write to clipboard:', err.message);
+            }
+        }
     });
 
     socket.on('disconnect', () => {

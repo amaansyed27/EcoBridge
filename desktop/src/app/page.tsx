@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState('Webcam');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -94,10 +95,48 @@ export default function Home() {
         </div>
 
         {/* Grid of Minimal Cards */}
-        <div className="grid grid-cols-3 gap-4 mt-20 w-fit">
-          <MinimalCard icon="📹" label="Webcam" active />
-          <MinimalCard icon="⌨️" label="Input" />
-          <MinimalCard icon="📋" label="Clipboard" />
+        <div className="grid grid-cols-2 gap-4 mt-20 w-fit">
+          <MinimalCard 
+            icon="📹" 
+            label="Webcam" 
+            active={activeTab === 'Webcam'} 
+            onClick={() => setActiveTab('Webcam')}
+          />
+          <MinimalCard 
+            icon="📋" 
+            label="Clipboard" 
+            active={activeTab === 'Clipboard'} 
+            onClick={() => setActiveTab('Clipboard')}
+          />
+        </div>
+
+        {/* Dynamic Content Area */}
+        <div className="mt-12 w-full max-w-2xl px-6">
+          {activeTab === 'Clipboard' && (
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center space-y-4">
+              <h3 className="text-xl font-medium">Universal Clipboard</h3>
+              <p className="text-white/40 text-sm">
+                Clipboard synchronization is active. <br/>
+                Anything you copy on this PC will be available on your phone, and vice-versa.
+              </p>
+              <div className="flex justify-center gap-2">
+                <div className="px-3 py-1 bg-green-500/10 text-green-500 rounded-full text-[10px] font-bold tracking-widest uppercase">Encrypted</div>
+                <div className="px-3 py-1 bg-blue-500/10 text-blue-500 rounded-full text-[10px] font-bold tracking-widest uppercase">Real-time</div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'Webcam' && (
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center space-y-4">
+              <h3 className="text-xl font-medium">Virtual Webcam</h3>
+              <p className="text-white/40 text-sm">
+                Select your phone from the list to start streaming.
+              </p>
+              <button className="px-8 py-3 bg-white text-black rounded-xl font-medium hover:bg-white/90 transition-colors">
+                Start Preview
+              </button>
+            </div>
+          )}
         </div>
 
       </div>
@@ -112,21 +151,27 @@ export default function Home() {
   );
 }
 
-function MinimalCard({ icon, label, active = false }: { icon: string; label: string; active?: boolean }) {
+function MinimalCard({ icon, label, active = false, onClick }: { icon: string; label: string; active?: boolean; onClick?: () => void }) {
   return (
-    <div className={`
-      w-32 h-32 rounded-3xl flex flex-col items-center justify-center gap-4
-      bg-white/[0.02] backdrop-blur-md border border-white/[0.04]
-      hover:bg-white/[0.05] hover:border-white/[0.08] hover:scale-[1.02]
-      transition-all duration-300 cursor-pointer
-      group
-    `}>
-      <span className="text-2xl opacity-60 group-hover:opacity-100 transition-opacity grayscale group-hover:grayscale-0">
+    <button 
+      onClick={onClick}
+      className={`
+        w-32 h-32 rounded-3xl flex flex-col items-center justify-center gap-4
+        ${active 
+          ? 'bg-white/10 border-white/20 shadow-[0_0_40px_rgba(255,255,255,0.05)]' 
+          : 'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.05] hover:border-white/[0.08]'
+        }
+        backdrop-blur-md border hover:scale-[1.02]
+        transition-all duration-300 cursor-pointer
+        group
+      `}
+    >
+      <span className={`text-2xl transition-opacity ${active ? 'opacity-100' : 'opacity-60 group-hover:opacity-100 grayscale group-hover:grayscale-0'}`}>
         {icon}
       </span>
-      <span className="text-[11px] font-medium text-white/30 group-hover:text-white/70 uppercase tracking-wider transition-colors">
+      <span className={`text-[11px] font-medium uppercase tracking-wider transition-colors ${active ? 'text-white/70' : 'text-white/30 group-hover:text-white/70'}`}>
         {label}
       </span>
-    </div>
+    </button>
   );
 }
