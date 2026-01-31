@@ -87,7 +87,15 @@ let lastClipboard = '';
 // Watch clipboard for changes
 setInterval(async () => {
     try {
-        const current = await clipboardy.read();
+        let current;
+        if (clipboardy.readSync) {
+            current = clipboardy.readSync();
+        } else if (clipboardy.default && clipboardy.default.readSync) {
+            current = clipboardy.default.readSync();
+        } else {
+            current = await clipboardy.read();
+        }
+
         if (current && current !== lastClipboard) {
             lastClipboard = current;
             if (io.engine.clientsCount > 0) {
@@ -204,11 +212,22 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('clipboard-sync', (data) => {
+    socket.on('clipboard-sync', async (data) => {
         if (data.text && data.text !== lastClipboard) {
             console.log('Clipboard sync received from mobile');
             lastClipboard = data.text;
-            clipboardy.writeSync(data.text);
+            try {
+                // Handle both ESM and CJS styles if possible, or fallback to async write
+                if (clipboardy.writeSync) {
+                    clipboardy.writeSync(data.text);
+                } else if (clipboardy.default && clipboardy.default.writeSync) {
+                    clipboardy.default.writeSync(data.text);
+                } else {
+                    await clipboardy.write(data.text);
+                }
+            } catch (err) {
+                console.error('Failed to write to clipboard:', err.message);
+            }
         }
     });
 
