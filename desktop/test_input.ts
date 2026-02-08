@@ -1,6 +1,7 @@
-const { io } = require("socket.io-client");
+import { io } from "socket.io-client";
+import type { Socket } from "socket.io-client";
 
-const socket = io("http://localhost:3001");
+const socket: Socket = io("http://localhost:3001");
 
 socket.on("connect", () => {
     console.log("Connected to server");
@@ -11,9 +12,6 @@ socket.on("connect", () => {
         type: "mouse-move",
         params: { dx: 400, dy: 50 }
     });
-
-    // Simulate a click event
-    
 
     // Simulate keyboard event
     setTimeout(() => {
@@ -39,6 +37,6 @@ socket.on("connect", () => {
     }, 5000);
 });
 
-socket.on("connect_error", (err) => {
+socket.on("connect_error", (err: Error) => {
     console.error("Connection error:", err);
 });

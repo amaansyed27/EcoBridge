@@ -1,12 +1,15 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { io } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
+import type { SystemStats } from '@/types';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('Webcam');
   const [mounted, setMounted] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [stats, setStats] = useState<SystemStats | null>(null);
   const [flipHorizontal, setFlipHorizontal] = useState(false);
   const [flipVertical, setFlipVertical] = useState(false);
   const socketRef = useRef<Socket | null>(null);
@@ -21,6 +24,11 @@ export default function Home() {
 
     socket.on('connect', () => {
       console.log('Connected to socket server');
+      socket.emit('register', 'desktop-ui');
+    });
+
+    socket.on('stats-update', (data: SystemStats) => {
+      setStats(data);
     });
 
     socket.on('video-frame', (data: ArrayBuffer) => {

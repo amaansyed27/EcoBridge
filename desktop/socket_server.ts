@@ -1,9 +1,19 @@
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const si = require('systeminformation');
-const loudness = require('loudness');
-const shell = require('shelljs');
+import express from 'express';
+import http from 'http';
+import { Server, Socket } from 'socket.io';
+import si from 'systeminformation';
+import loudness from 'loudness';
+import shell from 'shelljs';
+import clipboardy from 'clipboardy';
+import { 
+  SystemStatsSchema, 
+  CommandSchema, 
+  RemoteInputSchema, 
+  ClipboardSyncSchema,
+  RegisterSchema,
+  VideoFrameSchema,
+  type SystemStats
+} from './src/types';
 
 const app = express();
 const server = http.createServer(app);
@@ -11,23 +21,21 @@ const io = new Server(server, {
     cors: { origin: "*" }
 });
 
-const PORT = 3001; // Changed from 3000 to avoid conflict with Next.js
+const PORT = 3001;
 
 console.log("Starting EcoBridge Socket Server...");
 
-// System monitoring function with individual error handling to prevent hanging
-async function getSystemStats() {
+async function getSystemStats(): Promise<SystemStats | null> {
     try {
-        // Run calls individually with fallbacks to prevent one sensor from hanging the whole process
-        const cpu = await si.currentLoad().catch(e => ({ currentLoad: 0 }));
-        const mem = await si.mem().catch(e => ({ total: 1, available: 1 }));
-        const graphics = await si.graphics().catch(e => ({ controllers: [] }));
-        const cpuTemp = await si.cpuTemperature().catch(e => ({ main: 0 }));
+        const cpu = await si.currentLoad().catch(() => ({ currentLoad: 0 }));
+        const mem = await si.mem().catch(() => ({ total: 1, available: 1 }));
+        const graphics = await si.graphics().catch(() => ({ controllers: [] }));
+        const cpuTemp = await si.cpuTemperature().catch(() => ({ main: 0 }));
         
         const controllers = graphics.controllers || [];
         const mainGpu = controllers.find(g => g.model && !g.model.includes('Virtual')) || controllers[0] || {};
 
-        const stats = {
+        const stats: SystemStats = {
             cpu: {
                 load: Math.round(cpu.currentLoad || 0),
                 temp: Math.round(cpuTemp.main || 0)
@@ -38,23 +46,22 @@ async function getSystemStats() {
                 active: Math.round((mem.total - mem.available) / (1024 * 1024 * 1024))
             },
             gpu: {
-                load: mainGpu.utilizationGpu || mainGpu.memoryUsed || 0,
-                temp: mainGpu.temperatureGpu || 0,
+                load: Number(mainGpu.utilizationGpu || mainGpu.memoryUsed || 0),
+                temp: Number(mainGpu.temperatureGpu || 0),
                 name: mainGpu.model || 'Unknown'
             },
             volume: await loudness.getVolume().catch(() => 50),
             muted: await loudness.getMuted().catch(() => false)
         };
 
-        return stats;
+        return SystemStatsSchema.parse(stats);
     } catch (error) {
         console.error("Critical error in getSystemStats:", error);
         return null;
     }
 }
 
-// Media Control via PowerShell (Encoded for reliability)
-function sendMediaKey(key) {
+function sendMediaKey(key: 'playPause' | 'next' | 'prev' | 'stop') {
     const codes = {
         playPause: 0xB3,
         next: 0xB0,
@@ -67,8 +74,7 @@ function sendMediaKey(key) {
     }
 }
 
-// Win32 Input Simulation via PowerShell
-function executeWin32Key(vkCode, flags = 0) {
+function executeWin32Key(vkCode: number, flags: number = 0) {
     const psScript = `
         $signature = '[DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);'
         $type = Add-Type -MemberDefinition $signature -Name "Win32Utils" -Namespace "Win32" -PassThru
@@ -79,19 +85,17 @@ function executeWin32Key(vkCode, flags = 0) {
     shell.exec(`powershell -ExecutionPolicy Bypass -EncodedCommand ${encoded}`, { silent: true });
 }
 
-const clipboardy = require('clipboardy');
-
-// Store last clipboard content to avoid loops
 let lastClipboard = '';
 
-// Watch clipboard for changes
 setInterval(async () => {
     try {
-        let current;
+        let current: string;
+        // @ts-ignore - clipboardy types can be tricky with ESM/CJS
         if (clipboardy.readSync) {
+            // @ts-ignore
             current = clipboardy.readSync();
-        } else if (clipboardy.default && clipboardy.default.readSync) {
-            current = clipboardy.default.readSync();
+        } else if ((clipboardy as any).default && (clipboardy as any).default.readSync) {
+            current = (clipboardy as any).default.readSync();
         } else {
             current = await clipboardy.read();
         }
@@ -104,11 +108,11 @@ setInterval(async () => {
             }
         }
     } catch (err) {
-        // Silent fail for clipboard read errors
+        // Silent fail
     }
 }, 2000);
 
-function executeWin32Mouse(dx, dy, flags) {
+function executeWin32Mouse(dx: number, dy: number, flags: number) {
     let psScript;
     if (flags === 0x0001) { // MOUSEEVENTF_MOVE
         psScript = `
@@ -127,7 +131,7 @@ function executeWin32Mouse(dx, dy, flags) {
     shell.exec(`powershell -ExecutionPolicy Bypass -EncodedCommand ${encoded}`, { silent: true });
 }
 
-function executeWin32Text(text) {
+function executeWin32Text(text: string) {
     const psScript = `
         Add-Type -AssemblyName System.Windows.Forms
         [System.Windows.Forms.SendKeys]::SendWait("${text.replace(/"/g, '""')}")
@@ -136,36 +140,47 @@ function executeWin32Text(text) {
     shell.exec(`powershell -ExecutionPolicy Bypass -EncodedCommand ${encoded}`, { silent: true });
 }
 
-io.on('connection', (socket) => {
+io.on('connection', (socket: Socket) => {
     console.log('Device Connected:', socket.id);
 
-    // Send initial stats on connection
     getSystemStats().then(stats => {
         if (stats) {
-            console.log("Sending initial stats to", socket.id);
             socket.emit('stats-update', stats);
         }
     });
 
-    socket.on('register', async (type) => {
+    socket.on('register', async (rawType: unknown) => {
+        const result = RegisterSchema.safeParse(rawType);
+        if (!result.success) return;
+        
+        const type = result.data;
         console.log(`Registered as: ${type}`);
-        // Send fresh stats immediately upon registration
         const stats = await getSystemStats();
         if (stats) {
             socket.emit('stats-update', stats);
         }
     });
 
-    // Handle Commands
-    socket.on('command', async (data) => {
+    socket.on('command', async (rawData: unknown) => {
+        const result = CommandSchema.safeParse(rawData);
+        if (!result.success) {
+            console.error('Invalid command data:', result.error.format());
+            return;
+        }
+        
+        const data = result.data;
         console.log(`Command Received: ${data.action}`, data.params);
         
         switch (data.action) {
             case 'media':
-                sendMediaKey(data.params.type);
+                if (data.params.type && ['playPause', 'next', 'prev', 'stop'].includes(data.params.type)) {
+                    sendMediaKey(data.params.type as any);
+                }
                 break;
             case 'volume':
-                await loudness.setVolume(data.params.value);
+                if (typeof data.params.value === 'number') {
+                    await loudness.setVolume(data.params.value);
+                }
                 break;
             case 'mute':
                 const isMuted = await loudness.getMuted();
@@ -180,60 +195,66 @@ io.on('connection', (socket) => {
                 break;
         }
         
-        // Send updated stats immediately after command
         const stats = await getSystemStats();
-        io.emit('stats-update', stats);
+        if (stats) io.emit('stats-update', stats);
     });
 
-    socket.on('remote-input', (data) => {
+    socket.on('remote-input', (rawData: unknown) => {
+        const result = RemoteInputSchema.safeParse(rawData);
+        if (!result.success) {
+            console.error('Invalid remote-input data:', result.error.format());
+            return;
+        }
+
+        const data = result.data;
         switch (data.type) {
             case 'mouse-move':
-                // MOUSEEVENTF_MOVE = 0x0001
                 executeWin32Mouse(data.params.dx, data.params.dy, 0x0001);
                 break;
             case 'mouse-click':
-                console.log(`Mouse ${data.params.button} click request received`);
                 if (data.params.button === 'left') {
-                    // LEFTDOWN = 0x0002, LEFTUP = 0x0004
                     executeWin32Mouse(0, 0, 0x0002);
                     executeWin32Mouse(0, 0, 0x0004);
                 } else if (data.params.button === 'right') {
-                    // RIGHTDOWN = 0x0008, RIGHTUP = 0x0010
                     executeWin32Mouse(0, 0, 0x0008);
                     executeWin32Mouse(0, 0, 0x0010);
                 }
                 break;
             case 'keyboard':
                 if (data.params.text) {
-                    console.log(`Keyboard text received: "${data.params.text}"`);
                     executeWin32Text(data.params.text);
                 }
                 break;
         }
     });
 
-    socket.on('clipboard-sync', async (data) => {
+    socket.on('clipboard-sync', async (rawData: unknown) => {
+        const result = ClipboardSyncSchema.safeParse(rawData);
+        if (!result.success) return;
+
+        const data = result.data;
         if (data.text && data.text !== lastClipboard) {
             console.log('Clipboard sync received from mobile');
             lastClipboard = data.text;
             try {
-                // Handle both ESM and CJS styles if possible, or fallback to async write
+                // @ts-ignore
                 if (clipboardy.writeSync) {
+                    // @ts-ignore
                     clipboardy.writeSync(data.text);
-                } else if (clipboardy.default && clipboardy.default.writeSync) {
-                    clipboardy.default.writeSync(data.text);
+                } else if ((clipboardy as any).default && (clipboardy as any).default.writeSync) {
+                    (clipboardy as any).default.writeSync(data.text);
                 } else {
                     await clipboardy.write(data.text);
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error('Failed to write to clipboard:', err.message);
             }
         }
     });
 
-    socket.on('video-frame', (data) => {
-        // Broadcast the frame to all connected clients (including the desktop frontend)
-        socket.broadcast.emit('video-frame', data);
+    socket.on('video-frame', (rawData: unknown) => {
+        // Broadcast raw binary data to all connected clients
+        socket.broadcast.emit('video-frame', rawData);
     });
 
     socket.on('disconnect', () => {
@@ -241,18 +262,15 @@ io.on('connection', (socket) => {
     });
 });
 
-// Broadcast stats every 5 seconds
 setInterval(async () => {
     if (io.engine.clientsCount > 0) {
         const stats = await getSystemStats();
         if (stats) {
-            console.log(`Broadcasting stats to ${io.engine.clientsCount} devices`);
             io.emit('stats-update', stats);
         }
     }
 }, 5000);
 
 server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`   - Dashboard Server: http://localhost:${PORT}`);
+    console.log(`Socket Server running on port ${PORT}`);
 });

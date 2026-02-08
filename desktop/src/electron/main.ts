@@ -1,10 +1,11 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
-const path = require('path');
-const isDev = require('electron-is-dev');
-const io = require('socket.io-client');
+import { app, BrowserWindow, ipcMain } from 'electron';
+import path from 'path';
+import isDev from 'electron-is-dev';
+import { io } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
 
-let mainWindow;
-let socket;
+let mainWindow: BrowserWindow | null = null;
+let socket: Socket | null = null;
 
 function connectSocket() {
   socket = io('http://localhost:3001');
@@ -50,9 +51,9 @@ app.whenReady().then(() => {
 });
 
 // IPC Listeners for input
-ipcMain.on('send-input', (event, data) => {
+ipcMain.on('send-input', (_event, data: any) => {
   if (socket && socket.connected) {
-    socket.emit('input-event', data);
+    socket.emit('remote-input', data);
   }
 });
 

@@ -22,6 +22,15 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "src/electron/**/*.ts",
+     "socket_server.ts",
+     "test_clipboard.ts",
+     "test_input.ts"
+   ],
   "exclude": ["node_modules"]
 }

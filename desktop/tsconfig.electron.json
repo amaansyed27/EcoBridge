@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "outDir": "dist",
+    "noEmit": false
+  },
+  "include": ["src/electron/**/*.ts", "socket_server.ts", "src/types/**/*.ts", "test_clipboard.ts", "test_input.ts"]
+}

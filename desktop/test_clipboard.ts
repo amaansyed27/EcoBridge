@@ -1,6 +1,7 @@
-const { io } = require("socket.io-client");
+import { io } from "socket.io-client";
+import type { Socket } from "socket.io-client";
 
-const socket = io("http://localhost:3001");
+const socket: Socket = io("http://localhost:3001");
 
 socket.on("connect", () => {
     console.log("Connected to server");
@@ -14,7 +15,7 @@ socket.on("connect", () => {
     });
 
     // Listen for clipboard-sync events from desktop (if desktop clipboard changes)
-    socket.on("clipboard-sync", (data) => {
+    socket.on("clipboard-sync", (data: { text: string }) => {
         console.log("Received clipboard-sync from server:", data.text);
     });
 
@@ -28,6 +29,6 @@ socket.on("connect", () => {
     }, 10000);
 });
 
-socket.on("connect_error", (err) => {
+socket.on("connect_error", (err: Error) => {
     console.error("Connection error:", err);
 });
